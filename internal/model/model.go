@@ -3,7 +3,7 @@ package model
 import "time"
 
 type User struct {
-	ID       strding
+	ID       string
 	Username string
 	TeamName string
 	IsActive bool
@@ -23,7 +23,7 @@ const (
 
 type PullRequest struct {
 	ID                string
-	Name              strind
+	Name              string
 	AuthorId          string
 	Status            PRStatus
 	AssignedReviewers []string

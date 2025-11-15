@@ -4,9 +4,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/iamyblitz/pr-reviewer-service/internal/repo"
+	"github.com/iamyblitz/pr-reviewer-service/internal/service"
 )
 
 func main() {
+
+	r := repo.NewMemoryRepo()
+	svc := service.NewService(r)
+
+	_ = svc
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
