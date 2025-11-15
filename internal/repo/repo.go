@@ -4,7 +4,7 @@ import "github.com/iamyblitz/pr-reviewer-service/internal/model"
 
 type Repository interface {
 	// Teams
-	CreateTeam(team model.Team) error
+	CreateTeam(team *model.Team) error
 	GetTeam(name string) (*model.Team, error)
 
 	// Users
@@ -12,9 +12,9 @@ type Repository interface {
 	GetUserByID(userID string) (*model.User, error)
 
 	// Pull Requests
-	CreatePullRequest(pr model.PullRequest) error
+	CreatePullRequest(pr *model.PullRequest) error
 	GetPullRequestByID(id string) (*model.PullRequest, error)
-	UpdatePullRequest(pr model.PullRequest) error
+	UpdatePullRequest(pr *model.PullRequest) error
 
 	// Reviewers
 	SetReviewers(prID string, reviewers []string) error
