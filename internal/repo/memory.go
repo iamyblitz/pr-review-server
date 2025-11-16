@@ -66,10 +66,34 @@ func (m *MemoryRepo) GetTeam(name string) (*model.Team, error) {
 	return &copyTeam, nil
 }
 func (m *MemoryRepo) SetUserActive(userID string, isActive bool) (*model.User, error) {
-	panic("not implemented")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	u, ok := m.users[userID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	u.IsActive = isActive
+
+	copyUser := *u
+	return &copyUser, nil
 }
-func (m *MemoryRepo) GetUserByID(userID string) (*model.User, error) { panic("not implemented") }
-func (m *MemoryRepo) CreatePullRequest(pr *model.PullRequest) error  { panic("not implemented") }
+
+func (m *MemoryRepo) GetUserByID(userID string) (*model.User, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	u, ok := m.users[userID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	copyUser := *u
+	return &copyUser, nil
+}
+
+func (m *MemoryRepo) CreatePullRequest(pr *model.PullRequest) error { panic("not implemented") }
 func (m *MemoryRepo) GetPullRequestByID(id string) (*model.PullRequest, error) {
 	panic("not implemented")
 }

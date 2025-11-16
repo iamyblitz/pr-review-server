@@ -31,5 +31,13 @@ func NewRouter(svc *service.Service) http.Handler {
 		h.GetTeam(w, r)
 	})
 
+	mux.HandleFunc("/users/setIsActive", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		h.SetUserIsActive(w, r)
+	})
+
 	return mux
 }

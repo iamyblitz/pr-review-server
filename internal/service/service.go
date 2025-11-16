@@ -47,3 +47,14 @@ func (s *Service) GetTeam(name string) (*model.Team, error) {
 	}
 	return team, nil
 }
+
+func (s *Service) SetUserIsActive(userID string, isActive bool) (*model.User, error) {
+	user, err := s.repo.SetUserActive(userID, isActive)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return user, nil
+}
