@@ -11,18 +11,24 @@ func NewRouter(svc *service.Service) http.Handler {
 
 	mux := http.NewServeMux()
 
-	// health
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
 
-	// team/add
 	mux.HandleFunc("/team/add", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 		h.AddTeam(w, r)
+	})
+
+	mux.HandleFunc("/team/get", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		h.GetTeam(w, r)
 	})
 
 	return mux

@@ -82,3 +82,46 @@ func (h *Handler) AddTeam(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
+	teamName := r.URL.Query().Get("team_name")
+	if teamName == "" {
+		http.Error(w, "team_name is required", http.StatusBadRequest)
+		return
+	}
+
+	team, err := h.svc.GetTeam(teamName)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"code":    "NOT_FOUND",
+					"message": "resource not found",
+				},
+			})
+			return
+		}
+
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	members := make([]TeamMemberDTO, 0, len(team.Members))
+	for _, m := range team.Members {
+		members = append(members, TeamMemberDTO{
+			UserID:   m.ID,
+			Username: m.Username,
+			IsActive: m.IsActive,
+		})
+	}
+
+	resp := TeamDTO{
+		TeamName: team.Name,
+		Members:  members,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
