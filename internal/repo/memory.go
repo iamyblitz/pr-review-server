@@ -10,6 +10,7 @@ import (
 var (
 	ErrNotFound   = errors.New("not found")
 	ErrTeamExists = errors.New("team already exists")
+	ErrPRExists   = errors.New("pr already exists")
 )
 
 type MemoryRepo struct {
@@ -93,13 +94,110 @@ func (m *MemoryRepo) GetUserByID(userID string) (*model.User, error) {
 	return &copyUser, nil
 }
 
-func (m *MemoryRepo) CreatePullRequest(pr *model.PullRequest) error { panic("not implemented") }
-func (m *MemoryRepo) GetPullRequestByID(id string) (*model.PullRequest, error) {
-	panic("not implemented")
+func (m *MemoryRepo) CreatePullRequest(pr *model.PullRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.prs[pr.ID]; exists {
+		return ErrPRExists
+	}
+
+	copyPR := *pr
+	m.prs[pr.ID] = &copyPR
+
+	reviewersCopy := make([]string, len(pr.AssignedReviewers))
+	copy(reviewersCopy, pr.AssignedReviewers)
+	m.reviewers[pr.ID] = reviewersCopy
+
+	return nil
 }
-func (m *MemoryRepo) UpdatePullRequest(pr *model.PullRequest) error      { panic("not implemented") }
-func (m *MemoryRepo) SetReviewers(prID string, reviewers []string) error { panic("not implemented") }
-func (m *MemoryRepo) GetReviewers(prID string) ([]string, error)         { panic("not implemented") }
+func (m *MemoryRepo) GetPullRequestByID(id string) (*model.PullRequest, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	pr, ok := m.prs[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	copyPR := *pr
+	reviewers := m.reviewers[id]
+	reviewersCopy := make([]string, len(reviewers))
+	copy(reviewersCopy, reviewers)
+	copyPR.AssignedReviewers = reviewersCopy
+
+	return &copyPR, nil
+}
+
+func (m *MemoryRepo) UpdatePullRequest(pr *model.PullRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.prs[pr.ID]; !ok {
+		return ErrNotFound
+	}
+
+	copyPR := *pr
+	m.prs[pr.ID] = &copyPR
+
+	reviewersCopy := make([]string, len(pr.AssignedReviewers))
+	copy(reviewersCopy, pr.AssignedReviewers)
+	m.reviewers[pr.ID] = reviewersCopy
+
+	return nil
+}
+func (m *MemoryRepo) SetReviewers(prID string, reviewers []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	pr, ok := m.prs[prID]
+	if !ok {
+		return ErrNotFound
+	}
+
+	reviewersCopy := make([]string, len(reviewers))
+	copy(reviewersCopy, reviewers)
+	m.reviewers[prID] = reviewersCopy
+
+	pr.AssignedReviewers = reviewersCopy
+
+	return nil
+}
+
+func (m *MemoryRepo) GetReviewers(prID string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	reviewers, ok := m.reviewers[prID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	reviewersCopy := make([]string, len(reviewers))
+	copy(reviewersCopy, reviewers)
+
+	return reviewersCopy, nil
+}
+
 func (m *MemoryRepo) GetPullRequestsByReviewer(userID string) ([]model.PullRequest, error) {
-	panic("not implemented")
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []model.PullRequest
+
+	for prID, pr := range m.prs {
+		reviewers := m.reviewers[prID]
+		for _, r := range reviewers {
+			if r == userID {
+				copyPR := *pr
+				reviewersCopy := make([]string, len(reviewers))
+				copy(reviewersCopy, reviewers)
+				copyPR.AssignedReviewers = reviewersCopy
+				result = append(result, copyPR)
+				break
+			}
+		}
+	}
+
+	return result, nil
 }

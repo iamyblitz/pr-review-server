@@ -39,5 +39,29 @@ func NewRouter(svc *service.Service) http.Handler {
 		h.SetUserIsActive(w, r)
 	})
 
+	mux.HandleFunc("/pullRequest/create", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		h.CreatePullRequest(w, r)
+	})
+
+	mux.HandleFunc("/pullRequest/merge", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		h.MergePullRequest(w, r)
+	})
+
+	mux.HandleFunc("/users/getReview", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		h.GetUserReviews(w, r)
+	})
+
 	return mux
 }

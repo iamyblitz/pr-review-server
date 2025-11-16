@@ -62,3 +62,58 @@ func (h *Handler) SetUserIsActive(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+type PullRequestShortDTO struct {
+	ID       string `json:"pull_request_id"`
+	Name     string `json:"pull_request_name"`
+	AuthorID string `json:"author_id"`
+	Status   string `json:"status"`
+}
+
+type GetUserReviewResponse struct {
+	UserID       string                `json:"user_id"`
+	PullRequests []PullRequestShortDTO `json:"pull_requests"`
+}
+
+func (h *Handler) GetUserReviews(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		http.Error(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	prs, err := h.svc.GetUserReviews(userID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"code":    "NOT_FOUND",
+					"message": "resource not found",
+				},
+			})
+			return
+		}
+
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	resp := GetUserReviewResponse{
+		UserID:       userID,
+		PullRequests: make([]PullRequestShortDTO, 0, len(prs)),
+	}
+
+	for _, pr := range prs {
+		resp.PullRequests = append(resp.PullRequests, PullRequestShortDTO{
+			ID:       pr.ID,
+			Name:     pr.Name,
+			AuthorID: pr.AuthorID,
+			Status:   string(pr.Status),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
