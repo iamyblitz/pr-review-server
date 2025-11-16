@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  pr-reviewer-service:
+    build: .
+    container_name: pr-reviewer-service
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
