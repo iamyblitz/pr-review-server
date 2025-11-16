@@ -63,5 +63,13 @@ func NewRouter(svc *service.Service) http.Handler {
 		h.GetUserReviews(w, r)
 	})
 
+	mux.HandleFunc("/pullRequest/reassign", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		h.ReassignReviewer(w, r)
+	})
+
 	return mux
 }

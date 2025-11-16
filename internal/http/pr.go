@@ -154,3 +154,100 @@ func (h *Handler) MergePullRequest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+type ReassignPRRequest struct {
+	PullRequestID string `json:"pull_request_id"`
+	OldUserID     string `json:"old_user_id"`
+}
+
+type ReassignPRResponse struct {
+	PR         PullRequestDTO `json:"pr"`
+	ReplacedBy string         `json:"replaced_by"`
+}
+
+func (h *Handler) ReassignReviewer(w http.ResponseWriter, r *http.Request) {
+	var req ReassignPRRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	if req.PullRequestID == "" || req.OldUserID == "" {
+		http.Error(w, "pull_request_id and old_user_id are required", http.StatusBadRequest)
+		return
+	}
+
+	pr, replacedBy, err := h.svc.ReassignReviewer(req.PullRequestID, req.OldUserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrNotFound):
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"code":    "NOT_FOUND",
+					"message": "resource not found",
+				},
+			})
+			return
+		case errors.Is(err, service.ErrPRMerged):
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"code":    "PR_MERGED",
+					"message": "cannot reassign on merged PR",
+				},
+			})
+			return
+		case errors.Is(err, service.ErrNotAssigned):
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"code":    "NOT_ASSIGNED",
+					"message": "reviewer is not assigned to this PR",
+				},
+			})
+			return
+		case errors.Is(err, service.ErrNoCandidate):
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"code":    "NO_CANDIDATE",
+					"message": "no active replacement candidate in team",
+				},
+			})
+			return
+		default:
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	var createdAtStr *string
+	if pr.CreatedAt != nil {
+		s := pr.CreatedAt.Format(time.RFC3339)
+		createdAtStr = &s
+	}
+
+	var mergedAtStr *string
+	if pr.MergedAt != nil {
+		s := pr.MergedAt.Format(time.RFC3339)
+		mergedAtStr = &s
+	}
+
+	resp := ReassignPRResponse{
+		PR: PullRequestDTO{
+			ID:                pr.ID,
+			Name:              pr.Name,
+			AuthorID:          pr.AuthorID,
+			Status:            string(pr.Status),
+			AssignedReviewers: pr.AssignedReviewers,
+			CreatedAt:         createdAtStr,
+			MergedAt:          mergedAtStr,
+		},
+		ReplacedBy: replacedBy,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}

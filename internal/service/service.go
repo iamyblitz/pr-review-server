@@ -18,9 +18,12 @@ func NewService(r repo.Repository) *Service {
 }
 
 var (
-	ErrTeamExists = errors.New("team already exists")
-	ErrNotFound   = errors.New("not found")
-	ErrPRExists   = errors.New("pr already exists")
+	ErrTeamExists  = errors.New("team already exists")
+	ErrNotFound    = errors.New("not found")
+	ErrPRExists    = errors.New("pr already exists")
+	ErrPRMerged    = errors.New("pr already merged")
+	ErrNotAssigned = errors.New("reviewer not assigned to this PR")
+	ErrNoCandidate = errors.New("no active replacement candidate in team")
 )
 
 func (s *Service) CreateTeam(name string, members []model.User) (*model.Team, error) {
@@ -177,4 +180,85 @@ func (s *Service) GetUserReviews(userID string) ([]model.PullRequest, error) {
 	}
 
 	return prs, nil
+}
+
+func (s *Service) ReassignReviewer(prID, oldUserID string) (*model.PullRequest, string, error) {
+	pr, err := s.repo.GetPullRequestByID(prID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", err
+	}
+
+	if pr.Status == model.PRStatusMerged {
+		return nil, "", ErrPRMerged
+	}
+
+	idx := -1
+	for i, r := range pr.AssignedReviewers {
+		if r == oldUserID {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return nil, "", ErrNotAssigned
+	}
+
+	oldUser, err := s.repo.GetUserByID(oldUserID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", err
+	}
+
+	team, err := s.repo.GetTeam(oldUser.TeamName)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", err
+	}
+
+	assignedSet := make(map[string]struct{}, len(pr.AssignedReviewers))
+	for _, r := range pr.AssignedReviewers {
+		assignedSet[r] = struct{}{}
+	}
+
+	candidates := make([]model.User, 0, len(team.Members))
+	for _, m := range team.Members {
+		if !m.IsActive {
+			continue
+		}
+		if m.ID == oldUserID {
+			continue
+		}
+		if m.ID == pr.AuthorID {
+			continue
+		}
+		if _, alreadyAssigned := assignedSet[m.ID]; alreadyAssigned {
+			continue
+		}
+		candidates = append(candidates, m)
+	}
+
+	if len(candidates) == 0 {
+		return nil, "", ErrNoCandidate
+	}
+
+	newIdx := rand.Intn(len(candidates))
+	newReviewer := candidates[newIdx]
+
+	pr.AssignedReviewers[idx] = newReviewer.ID
+
+	if err := s.repo.UpdatePullRequest(pr); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", err
+	}
+
+	return pr, newReviewer.ID, nil
 }
