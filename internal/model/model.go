@@ -17,14 +17,14 @@ type Team struct {
 type PRStatus string
 
 const (
-	PROpen   PRStatus = "open"
-	PRMerged PRStatus = "merged"
+	PRStatusOpen   PRStatus = "open"
+	PRStatusMerged PRStatus = "merged"
 )
 
 type PullRequest struct {
 	ID                string
 	Name              string
-	AuthorId          string
+	AuthorID          string
 	Status            PRStatus
 	AssignedReviewers []string
 	CreatedAt         *time.Time
